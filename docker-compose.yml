@@ -1,0 +1,21 @@
+services:
+  ner-service:
+    build: .
+    container_name: lexicon-ner
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+    environment:
+      - MODEL_PATH=/app/models/indonesian-ner-model
+      - TOKENIZER_PATH=/app/models/tokenizer
+      - CACHE_SIZE=1000
+      - MAX_BATCH_SIZE=32
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G

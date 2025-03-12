@@ -1,0 +1,1 @@
+"""Lexicon NER API application package."""
