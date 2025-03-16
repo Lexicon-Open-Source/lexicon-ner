@@ -8,10 +8,20 @@ import json
 import requests
 import sys
 import time
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # API endpoint
 API_URL = "http://localhost:8000/api/ner"
 BATCH_API_URL = "http://localhost:8000/api/ner/batch"
+HEALTH_URL = "http://localhost:8000/api/health"
+
+# Get API key from environment variable or use default
+API_KEY = os.getenv("API_KEY", "lexicon-ner-default-key")
+HEADERS = {"X-API-Key": API_KEY}
 
 # Sample Indonesian texts
 SAMPLE_TEXTS = [
@@ -30,7 +40,7 @@ def test_single_request():
         print(f"\nInput: {text}")
 
         # Send request
-        response = requests.post(API_URL, json={"text": text})
+        response = requests.post(API_URL, headers=HEADERS, json={"text": text})
 
         # Check if request was successful
         if response.status_code == 200:
@@ -47,7 +57,7 @@ def test_batch_request():
     print("\nTesting batch NER...")
 
     # Send request
-    response = requests.post(BATCH_API_URL, json={"texts": SAMPLE_TEXTS})
+    response = requests.post(BATCH_API_URL, headers=HEADERS, json={"texts": SAMPLE_TEXTS})
 
     # Check if request was successful
     if response.status_code == 200:
@@ -67,21 +77,21 @@ def test_performance():
     print("\nTesting performance...")
 
     # Warm-up request
-    response = requests.post(API_URL, json={"text": SAMPLE_TEXTS[0]})
+    response = requests.post(API_URL, headers=HEADERS, json={"text": SAMPLE_TEXTS[0]})
 
     # Measure latency for single requests
     start_time = time.time()
     num_requests = 5
 
     for _ in range(num_requests):
-        response = requests.post(API_URL, json={"text": SAMPLE_TEXTS[0]})
+        response = requests.post(API_URL, headers=HEADERS, json={"text": SAMPLE_TEXTS[0]})
 
     single_latency = (time.time() - start_time) / num_requests
     print(f"Average latency for single requests: {single_latency*1000:.2f} ms")
 
     # Measure latency for batch request
     start_time = time.time()
-    response = requests.post(BATCH_API_URL, json={"texts": SAMPLE_TEXTS})
+    response = requests.post(BATCH_API_URL, headers=HEADERS, json={"texts": SAMPLE_TEXTS})
     batch_latency = time.time() - start_time
     print(f"Latency for batch request with {len(SAMPLE_TEXTS)} texts: {batch_latency*1000:.2f} ms")
     print(f"Average latency per text in batch: {batch_latency*1000/len(SAMPLE_TEXTS):.2f} ms")
@@ -89,7 +99,7 @@ def test_performance():
 if __name__ == "__main__":
     # Check if health endpoint is available
     try:
-        health_response = requests.get("http://localhost:8000/api/health")
+        health_response = requests.get(HEALTH_URL, headers=HEADERS)
         if health_response.status_code != 200:
             print("Error: API is not healthy. Please make sure the server is running.")
             sys.exit(1)

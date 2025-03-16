@@ -6,12 +6,17 @@ services:
       - "8000:8000"
     volumes:
       - ./models:/app/models
+    env_file:
+      - .env
     environment:
-      - MODEL_PATH=/app/models/indonesian-ner-model
-      - TOKENIZER_PATH=/app/models/tokenizer
-      - CACHE_SIZE=1000
-      - MAX_BATCH_SIZE=32
-      - LOG_LEVEL=INFO
+      - MODEL_PATH=${MODEL_PATH:-/app/models/indonesian-ner-model}
+      - TOKENIZER_PATH=${TOKENIZER_PATH:-/app/models/tokenizer}
+      - CACHE_SIZE=${CACHE_SIZE:-1000}
+      - MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-32}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - API_KEY=${API_KEY:-lexicon-ner-default-key}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-1}
+      - USE_CUDA=${USE_CUDA:-0}
     restart: unless-stopped
     # Resource limits
     deploy:

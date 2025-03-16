@@ -15,6 +15,7 @@ build/
 
 # Local development settings
 .env
+!.env.sample
 .venv
 
 # Models directory (to avoid committing large files)

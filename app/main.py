@@ -2,10 +2,15 @@ import os
 import logging
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
-from app.api.endpoints import ner
-from app.core.config import Settings
+# Load environment variables from .env file
+load_dotenv()
+
+from app.api.endpoints import ner, legal
+from app.core.config import Settings, get_settings
 from app.core.model_loader import ModelLoader, get_model_loader
+from app.core.security import get_api_key
 
 # Setup logging
 logging.basicConfig(
@@ -17,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI application
 app = FastAPI(
     title="Lexicon Named Entity Recognition API",
-    description="API for Indonesian Named Entity Recognition using Flair NLP",
+    description="API for Indonesian Named Entity Recognition using Flair NLP. Secured with API key authentication. Includes legal entity recognition using ChatGPT API.",
     version="1.0.0",
 )
 
@@ -32,14 +37,24 @@ app.add_middleware(
 
 # Include routers
 app.include_router(ner.router, prefix="/api", tags=["ner"])
+app.include_router(legal.router, prefix="/api", tags=["legal"])
 
 # Health check endpoint
 @app.get("/api/health", tags=["health"])
-async def health_check(model_loader: ModelLoader = Depends(get_model_loader)):
-    """Check if the service is healthy and model is loaded."""
+async def health_check(
+    model_loader: ModelLoader = Depends(get_model_loader),
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Check if the service is healthy and model is loaded.
+
+    Requires API key authentication via the X-API-Key header when API key security is enabled.
+    """
+    settings = get_settings()
     return {
         "status": "ok",
         "model_loaded": model_loader.is_model_loaded(),
+        "openai_configured": bool(settings.OPENAI_API_KEY),
         "version": "1.0.0"
     }
 
@@ -53,8 +68,16 @@ async def startup_event():
         model_loader = get_model_loader()
         model_loader.load_model()
         logger.info("Model loaded successfully")
+
+        # Check OpenAI configuration
+        settings = get_settings()
+        if settings.OPENAI_API_KEY:
+            logger.info(f"OpenAI API key configured. Using model: {settings.OPENAI_MODEL}")
+        else:
+            logger.warning("OpenAI API key not configured. Legal entity analysis will not be available.")
+
     except Exception as e:
-        logger.error(f"Error loading model: {e}")
+        logger.error(f"Error during startup: {e}")
         # We'll continue and try to load the model on the first request
 
 # Shutdown event

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import Settings, get_settings
 from app.core.model_loader import ModelLoader, get_model_loader
+from app.core.security import get_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,8 @@ class BatchNERResponse(BaseModel):
 async def extract_entities(
     request: NERRequest,
     model_loader: ModelLoader = Depends(get_model_loader),
-    settings: Settings = Depends(get_settings)
+    settings: Settings = Depends(get_settings),
+    api_key: str = Depends(get_api_key)
 ):
     """
     Extract named entities from the given text.
@@ -57,6 +59,8 @@ async def extract_entities(
     - ORG (Organization)
 
     Returns a list of entities with their types, positions, and confidence scores.
+
+    Requires API key authentication via the X-API-Key header.
     """
     try:
         # Process the request
@@ -86,7 +90,8 @@ async def extract_entities(
 async def extract_entities_batch(
     request: BatchNERRequest,
     model_loader: ModelLoader = Depends(get_model_loader),
-    settings: Settings = Depends(get_settings)
+    settings: Settings = Depends(get_settings),
+    api_key: str = Depends(get_api_key)
 ):
     """
     Extract named entities from multiple texts in a single request.
@@ -95,6 +100,8 @@ async def extract_entities_batch(
     be significantly faster than making multiple individual requests.
 
     Returns a list of NER results, one for each input text.
+
+    Requires API key authentication via the X-API-Key header.
     """
     try:
         # Process the request
