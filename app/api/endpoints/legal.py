@@ -94,6 +94,8 @@ async def extract_legal_entities(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="OpenAI client not initialized correctly. Please check your API key and model settings."
                 )
+            else:
+                logger.info("OpenAI client is initialized, but no entities were found.")
 
         # Convert to LegalEntity objects
         entity_objects = []
@@ -119,7 +121,7 @@ async def extract_legal_entities(
         raise
     except Exception as e:
         # Log detailed error and provide generic message to client
-        logger.error(f"Error processing text: {e}")
+        logger.error(f"Error processing text: {type(e).__name__} - {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
