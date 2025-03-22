@@ -7,9 +7,8 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from app.api.endpoints import ner, legal
+from app.api.endpoints import  legal
 from app.core.config import Settings, get_settings
-from app.core.model_loader import ModelLoader, get_model_loader
 from app.core.security import get_api_key
 
 # Setup logging
@@ -21,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI application
 app = FastAPI(
-    title="Lexicon Named Entity Recognition API",
-    description="API for Indonesian Named Entity Recognition using Flair NLP. Secured with API key authentication. Includes legal entity recognition using ChatGPT API.",
+    title="Lexicon Legal Entity Recognition API",
+    description="API for Indonesian Legal Entity Recognition using ChatGPT API.",
     version="1.0.0",
 )
 
@@ -36,13 +35,11 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(ner.router, prefix="/api", tags=["ner"])
 app.include_router(legal.router, prefix="/api", tags=["legal"])
 
 # Health check endpoint
 @app.get("/api/health", tags=["health"])
 async def health_check(
-    model_loader: ModelLoader = Depends(get_model_loader),
     api_key: str = Depends(get_api_key)
 ):
     """
@@ -53,7 +50,6 @@ async def health_check(
     settings = get_settings()
     return {
         "status": "ok",
-        "model_loaded": model_loader.is_model_loaded(),
         "openai_configured": bool(settings.OPENAI_API_KEY),
         "version": "1.0.0"
     }
@@ -62,13 +58,8 @@ async def health_check(
 @app.on_event("startup")
 async def startup_event():
     """Preload the model on startup for faster inference."""
-    logger.info("Starting up the NER service")
+    logger.info("Starting up the Legal Entity Recognition service")
     try:
-        # Preload model for faster inference
-        model_loader = get_model_loader()
-        model_loader.load_model()
-        logger.info("Model loaded successfully")
-
         # Check OpenAI configuration
         settings = get_settings()
         if settings.OPENAI_API_KEY:

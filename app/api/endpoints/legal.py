@@ -1,7 +1,8 @@
 import logging
+import traceback
 from typing import Dict, List, Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.core.config import Settings, get_settings
@@ -64,32 +65,66 @@ async def extract_legal_entities(
     try:
         # Check if OpenAI API key is configured
         if not settings.OPENAI_API_KEY:
+            logger.error("OpenAI API key not configured")
             raise HTTPException(
-                status_code=501,
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail="OpenAI API key not configured. Please set OPENAI_API_KEY in the environment variables."
             )
 
+        # Check if model exists and is available in OpenAI's API
+        model = settings.OPENAI_MODEL
+        if not model:
+            logger.error("OpenAI model name not configured")
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="OpenAI model name not configured. Please set OPENAI_MODEL in the environment variables."
+            )
+
         # Process the request
+        logger.info(f"Processing legal entity request with text length: {len(request.text)}")
         entities = analyzer.analyze_legal_entities(request.text)
+
+        if not entities and request.text and len(request.text) > settings.MIN_TEXT_LENGTH:
+            logger.warning(f"No entities found in text with length {len(request.text)}")
+            # This might indicate an error in processing
+            # Check if OpenAI client is initialized properly
+            if not analyzer.client:
+                logger.error("OpenAI client not initialized correctly")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="OpenAI client not initialized correctly. Please check your API key and model settings."
+                )
 
         # Convert to LegalEntity objects
         entity_objects = []
         for entity in entities:
-            entity_objects.append(LegalEntity(
-                name=entity['name'],
-                role=entity['role'],
-                confidence=entity['confidence']
-            ))
+            try:
+                entity_objects.append(LegalEntity(
+                    name=entity['name'],
+                    role=entity['role'],
+                    confidence=entity['confidence']
+                ))
+            except KeyError as e:
+                logger.error(f"Missing field in entity: {e}")
+                logger.error(f"Entity data: {entity}")
+                # Continue with next entity instead of failing completely
+                continue
 
         return LegalEntityResponse(
             entities=entity_objects,
             text=request.text
         )
     except HTTPException:
+        # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        # Log detailed error and provide generic message to client
         logger.error(f"Error processing text: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing text: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing text: {str(e)}"
+        )
 
 # Batch legal entity recognition for multiple texts
 @router.post("/legal-entities/batch", response_model=BatchLegalEntityResponse, summary="Extract legal entities from multiple texts")
@@ -117,12 +152,23 @@ async def extract_legal_entities_batch(
     try:
         # Check if OpenAI API key is configured
         if not settings.OPENAI_API_KEY:
+            logger.error("OpenAI API key not configured")
             raise HTTPException(
-                status_code=501,
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail="OpenAI API key not configured. Please set OPENAI_API_KEY in the environment variables."
             )
 
+        # Check if model exists and is available in OpenAI's API
+        model = settings.OPENAI_MODEL
+        if not model:
+            logger.error("OpenAI model name not configured")
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="OpenAI model name not configured. Please set OPENAI_MODEL in the environment variables."
+            )
+
         # Process the request
+        logger.info(f"Processing batch legal entity request with {len(request.texts)} texts")
         batch_results = analyzer.analyze_legal_entities_batch(request.texts)
 
         # Convert to response objects
@@ -130,11 +176,17 @@ async def extract_legal_entities_batch(
         for i, entities in enumerate(batch_results):
             entity_objects = []
             for entity in entities:
-                entity_objects.append(LegalEntity(
-                    name=entity['name'],
-                    role=entity['role'],
-                    confidence=entity['confidence']
-                ))
+                try:
+                    entity_objects.append(LegalEntity(
+                        name=entity['name'],
+                        role=entity['role'],
+                        confidence=entity['confidence']
+                    ))
+                except KeyError as e:
+                    logger.error(f"Missing field in entity: {e}")
+                    logger.error(f"Entity data: {entity}")
+                    # Continue with next entity instead of failing completely
+                    continue
 
             responses.append(LegalEntityResponse(
                 entities=entity_objects,
@@ -145,7 +197,13 @@ async def extract_legal_entities_batch(
             results=responses
         )
     except HTTPException:
+        # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        # Log detailed error and provide generic message to client
         logger.error(f"Error processing batch: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing batch: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing batch: {str(e)}"
+        )

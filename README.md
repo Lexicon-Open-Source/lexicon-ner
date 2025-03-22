@@ -1,33 +1,28 @@
-# Lexicon Named Entity Recognition
+# Lexicon Named Entity Recognition for Legal Documents
 
-This project implements Indonesian Named Entity Recognition using Flair NLP with the following features:
+This project implements Legal Entity Recognition using OpenAI LLM API via LiteLLM with the following features:
 - Docker deployment
-- Optimized for low latency
-- Named entity type recognition (PER, LOC, ORG)
-- Special handling for person titles
+- Legal entity role recognition (defendant, plaintiff, representative)
 - API key authentication
 - Environment-based configuration
-- Legal entity recognition (with ChatGPT API)
+- Batch processing capability for efficiency
+- Support for multilingual text (English and Indonesian)
 
 ## Features
-- Recognizes and extracts named entities from Indonesian text
-- Removes non-academic titles from person names (e.g., "Presiden", "Gubernur", "Menteri")
-- Preserves academic titles (e.g., "Dr.", "Prof.")
-- Handles geographic/location identifiers in titles (e.g., "Gubernur Jawa Barat")
+- Recognizes and extracts legal entities from text
+- Identifies legal roles including defendants, plaintiffs, and representatives
+- Handles Indonesian legal terminology
 - Provides confidence scores for each recognized entity
 - Secures API endpoints with API key authentication
 - Uses .env file for easy configuration
-- Identifies legal roles (defendant, plaintiff, representative) using OpenAI's ChatGPT API
+- Efficient batch processing for multiple documents
+- Special handling for Indonesian names with titles and lineage
 
 ## Project Structure
 - `app/` - Contains the FastAPI application
-- `models/` - Directory for storing Flair NLP models
 - `Dockerfile` - Docker configuration
 - `requirements.txt` - Python dependencies
 - `docker-compose.yml` - Docker Compose configuration
-- `run.sh` - Helper script for managing the service
-- `test_ner.py` - Test script for NER API
-- `test_legal.py` - Test script for legal entity recognition API
 - `.env.sample` - Sample environment variables configuration
 
 ## Setup and Usage
@@ -36,45 +31,38 @@ This project implements Indonesian Named Entity Recognition using Flair NLP with
 
 The project uses a `.env` file for configuration. A sample configuration file is provided in `.env.sample`.
 
-You can easily edit the configuration using the helper script:
-```bash
-./run.sh config
-```
+To create your own configuration:
 
-This will open the `.env` file in your default text editor. If the file doesn't exist, it will be created from the sample.
+```bash
+# Copy the sample file to create your own .env file
+cp .env.sample .env
+
+# Edit the .env file with your preferred editor
+nano .env
+```
 
 Important configuration options:
 - `API_KEY` - The API key for authentication (default: "lexicon-ner-default-key")
 - `REQUIRE_API_KEY` - Whether to require API key authentication (1=enabled, 0=disabled)
 - `CACHE_SIZE` - Number of requests to cache (default: 1000)
 - `LOG_LEVEL` - Logging level (INFO, DEBUG, WARNING, ERROR)
-- `USE_CUDA` - Whether to use GPU for inference (1=enabled, 0=disabled)
 - `OPENAI_API_KEY` - Your OpenAI API key (required for legal entity recognition)
-- `OPENAI_MODEL` - The OpenAI model to use (default: "gpt-4")
+- `OPENAI_MODEL` - The OpenAI model to use (default: "gpt-4o-mini")
 
 ### API Key Security
 
-The API is secured with API key authentication. You can set your API key in the `.env` file or by:
+The API is secured with API key authentication. You can set your API key in the `.env` file or by setting environment variables in your docker-compose.yml file:
 
-1. Setting the `API_KEY` environment variable before starting the service:
-   ```bash
-   export API_KEY=your-secret-api-key
-   ./run.sh start
-   ```
-
-2. Using the `--api-key` option with the run.sh script:
-   ```bash
-   ./run.sh start --api-key=your-secret-api-key
-   ```
-
-To disable API key security, set the `REQUIRE_API_KEY` environment variable to `0` in the `.env` file or use:
-```bash
-./run.sh start --no-auth
+```yaml
+environment:
+  - API_KEY=your-secret-api-key
 ```
+
+To disable API key security, set the `REQUIRE_API_KEY` environment variable to `0` in the `.env` file.
 
 ### OpenAI Integration
 
-The legal entity recognition feature requires an OpenAI API key. To use this feature:
+The legal entity recognition requires an OpenAI API key. To use this:
 
 1. Get an API key from [OpenAI](https://platform.openai.com/)
 2. Add your API key to the `.env` file:
@@ -83,53 +71,47 @@ The legal entity recognition feature requires an OpenAI API key. To use this fea
    ```
 3. Restart the service:
    ```bash
-   ./run.sh restart
+   docker compose down && docker compose up -d
    ```
 
-### Using the helper script
+### Basic Docker Commands
 
-The project includes a helper script `run.sh` to simplify common operations:
+Here are the basic Docker commands to manage the service:
 
 ```bash
 # Start the service
-./run.sh start
-
-# Check service status
-./run.sh status
+docker compose up -d
 
 # View logs
-./run.sh logs
-
-# Edit configuration
-./run.sh config
-
-# Run tests
-./run.sh test
-
-# Rebuild the service (after code changes)
-./run.sh rebuild
+docker compose logs -f
 
 # Stop the service
-./run.sh stop
+docker compose down
 
-# Show help
-./run.sh help
+# Rebuild and restart the service (after code changes)
+docker compose build
+docker compose up -d
+
+# Check if the service is running
+docker compose ps
 ```
 
 ### Manual setup
 
 1. Build and run the Docker container:
-   ```
+   ```bash
+   # Build the Docker image
+   docker compose build
+
+   # Start the service
    docker compose up -d
    ```
 
 2. Access the API at http://localhost:8000
 
 3. API Endpoints:
-   - `POST /api/ner` - Recognize named entities in a single text
-   - `POST /api/ner/batch` - Recognize named entities in multiple texts
    - `POST /api/legal-entities` - Identify legal roles in a single text
-   - `POST /api/legal-entities/batch` - Identify legal roles in multiple texts
+   - `POST /api/legal-entities/batch` - Identify legal roles in multiple texts (efficient batch processing)
    - `GET /api/health` - Health check endpoint
 
 ## API Documentation
@@ -137,62 +119,44 @@ Once running, visit http://localhost:8000/docs for the Swagger UI API documentat
 
 ## Example Usage
 
-### Named Entity Recognition
-```python
-import requests
-from dotenv import load_dotenv
-import os
-
-# Load API key from .env file
-load_dotenv()
-api_key = os.getenv("API_KEY", "lexicon-ner-default-key")
-headers = {"X-API-Key": api_key}
-
-# Single text NER
-response = requests.post(
-    "http://localhost:8000/api/ner",
-    headers=headers,
-    json={"text": "Presiden Joko Widodo mengunjungi Jakarta untuk bertemu dengan Menteri Anies Baswedan."}
-)
-print(response.json())
+### Legal Entity Recognition
+```bash
+# Single text legal entity recognition
+curl -X POST "http://localhost:8000/api/legal-entities" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
+  -d '{
+    "text": "In the case of Smith v. Jones, the plaintiff John Smith filed a lawsuit against the defendant Sarah Jones."
+  }'
 ```
 
-### Legal Entity Recognition
-```python
-import requests
-from dotenv import load_dotenv
-import os
-
-# Load API key from .env file
-load_dotenv()
-api_key = os.getenv("API_KEY", "lexicon-ner-default-key")
-headers = {"X-API-Key": api_key}
-
-# Single text legal entity recognition
-response = requests.post(
-    "http://localhost:8000/api/legal-entities",
-    headers=headers,
-    json={"text": "In the case of Smith v. Jones, the plaintiff John Smith filed a lawsuit against the defendant Sarah Jones."}
-)
-print(response.json())
+### Batch Processing
+```bash
+# Batch processing for multiple texts
+curl -X POST "http://localhost:8000/api/legal-entities/batch" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
+  -d '{
+    "texts": [
+      "In the case of Smith v. Jones, the plaintiff John Smith filed a lawsuit against the defendant Sarah Jones.",
+      "Terdakwa BUDI SANTOSO alias BUDI alias SANTO bin WARIMAN telah ditetapkan bersalah.",
+      "JAKSA/PENUNTUT UMUM PADA KEJAKSAAN NEGERI TANGERANG melawan Terdakwa H. NAWAWI, S.Ip. bin MUSA"
+    ]
+  }'
 ```
 
 ## Performance Considerations
-The system is optimized for low latency by:
-- Using a lightweight Flair configuration
-- Implementing proper caching strategies
-- Optimized model loading and inference
+The system is optimized for efficiency by:
+- Implementing batch processing for multiple documents
+- Using proper caching strategies
+- Supporting both English and Indonesian legal texts in a single model
 
-Note that the legal entity recognition feature relies on the OpenAI API, which may have higher latency than the local NER model.
+Note that the legal entity recognition relies on the OpenAI API, which may have variable latency depending on network conditions and OpenAI's service status.
 
-## Model Information
-The system uses different models for different types of entity recognition:
-
-### Named Entity Recognition
-1. "ner-multi" - Flair's multilingual NER model
-2. "cahya/bert-base-indonesian-NER" - BERT model for Indonesian NER
-3. "cahya/xlm-roberta-base-indonesian-NER" - XLM-RoBERTa model for Indonesian NER
-
-### Legal Entity Recognition
-- Uses OpenAI's GPT-4 model to analyze legal texts and identify roles
-- Requires a valid OpenAI API key
+## Multilingual Support
+The system supports both English and Indonesian legal texts. For Indonesian texts, it includes special handling for:
+- Academic titles (Drs., Ir., Dr., Prof., etc.)
+- Religious titles (H., Hj.)
+- Lineage indicators (bin/binti)
+- Various alias formats commonly used in Indonesian legal documents
+- Indonesian legal terminology (Penggugat, Terdakwa, Jaksa/Penuntut Umum, etc.)
