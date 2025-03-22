@@ -25,7 +25,7 @@ class LegalEntityAnalyzer:
         # Initialize LiteLLM
         if not settings.OPENAI_API_KEY:
             logger.warning("OpenAI API key not set. Legal entity analysis will not work.")
-            return
+            raise ValueError("OpenAI API key not set. Legal entity analysis will not work.")
 
         try:
             # Configure LiteLLM with the API key
